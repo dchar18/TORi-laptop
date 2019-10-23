@@ -38,3 +38,5 @@ Trigger words:
 - 'look up' = open new chrome window and look up search query
 - 'open' = open specified application
 - 'create a new text file' = creates new text file in Sublime Text
+- 'start the car' = initializes bluetooth connection with Ardulego car, 
+	which enables TORi to control the car via voice commands
