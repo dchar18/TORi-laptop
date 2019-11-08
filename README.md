@@ -49,7 +49,7 @@ Currently able to...
 - recognize command and response 
 	- receives vocal commands, converts it to text, and processes the command
 	- converts text to speech as a response to command
-- autonomously open new Google window and autonomously look up search queries
+- autonomously open new Google window and look up search queries
 	- directly finds images if asked to look up an image
 	- else performs standard search
 - autonomously open new Google window and sign into Gmail
