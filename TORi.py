@@ -7,7 +7,8 @@ import cv2                          # for facial recognition and possibly autono
 import pickle
 import numpy as np
 from PIL import Image
-
+import requests, json               # for weather API
+import imaplib                      # for determining num of unread emails?
 # libraries for Google searches
 # for searches
 from selenium import webdriver
@@ -29,7 +30,7 @@ from selenium.webdriver.support import expected_conditions as EC
 def greeting():
     verified = False
     failed_attempts = 0
-    say("Running facial biometrics scan")
+    say("Running facial biometrics")
     while verified is False and failed_attempts < 3:
         user = facial_recognition()
         if user == '':
@@ -48,6 +49,7 @@ def greeting():
 
 
 def facial_train():
+    say("Creating facial recognition dataset")
     base_directory = os.path.dirname(os.path.abspath(__file__))
     image_dir = os.path.join(base_directory, "images")
 
@@ -70,7 +72,7 @@ def facial_train():
                     current_id += 1
 
                 id_ = label_ids[label]
-                print(label_ids)
+                # print(label_ids)
                 pil_image = Image.open(path).convert("L")  # convert to grayscale
                 image_array = np.array(pil_image, 'uint8')
                 faces = face_cascade.detectMultiScale(image_array, scaleFactor=1.1, minNeighbors=5)
@@ -86,6 +88,7 @@ def facial_train():
 
     recognizer.train(x_train, np.array(y_labels))
     recognizer.save("trainer.yml")
+    say("Dataset created")
 
 
 def facial_recognition():  # TODO
@@ -222,8 +225,9 @@ def search():
 
 
 def check_email():
-    email_login = "dncharczuk81800@gmail.com"
-    password_login = "DCgoogle!800"
+    email_login = 'dncharczuk81800@gmail.com'
+    email_user = 'dncharczuk81800'
+    password_login = 'DCgoogle!800'
     chrome_path = "/usr/local/bin/chromedriver"
     browser = webdriver.Chrome(chrome_path)
     browser.get(('https://accounts.google.com/ServiceLogin?'
@@ -236,20 +240,103 @@ def check_email():
     nextButton = browser.find_element_by_id('identifierNext')
     nextButton.click()
 
-    password = WebDriverWait(browser, 12).until(
+    password = WebDriverWait(browser, 20).until(
         EC.presence_of_element_located((By.NAME, "password")))
-    password.send_keys(password_login)
+    try:
+        password.send_keys(password_login)
+        signInButton = browser.find_element_by_id('passwordNext')
+        signInButton.click()
+    except:
+        print("Unable to enter password")
 
-    signInButton = browser.find_element_by_id('passwordNext')
-    signInButton.click()
     # say how many unread emails
+    try:
+        obj = imaplib.IMAP4_SSL('imap.gmail.com', '993')
+        obj.login(email_login, password_login)
+        obj.select("inbox", True)
+        return_code, mail_ids = obj.search(None, 'UnSeen')
+        count = len(mail_ids[0].split(" "))
+        print("Count: " + str(count))
+    except:
+        print("Unable to access email count")
 
 
-def open_page():
+def open_page_parse():
     website = command_received.split('navigate to ')[-1]
+    open_page(website)
+
+
+def open_page(website):
     chrome_path = "/usr/local/bin/chromedriver"
     browser = webdriver.Chrome(chrome_path)
     browser.get('http://www.' + website)
+    if browser == 'weather.com':
+        location = "Arlington Heights"
+        location_input = browser.find_element_by_class_name("theme__inputElement__4bZUj input__inputElement__1GjGE")
+        location_input.send_keys(location)
+
+
+def kelvin_to_F(kelvin):
+    return int((kelvin - 273.15) * 1.8 + 32)
+
+
+def weather_data(location):  # use weather API to recite local weather data
+    print("In weather date()")
+    api_key = "2070c00d32fdfeaac43d863f958634a8"
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
+    location = location + " "
+    complete_url = base_url + "appid=" + api_key + "&q=" + location
+
+    response = requests.get(complete_url)
+    x = response.json()
+
+    if x["cod"] != "404":
+        # store the value of "main"
+        # key in variable y
+        y = x["main"]
+
+        curr_temp_kelvin = y["temp"]  # value is in Kelvin
+        curr_temp_F = kelvin_to_F(curr_temp_kelvin) # convert to degrees F
+        temp_low = kelvin_to_F(y["temp_min"])
+        temp_high = kelvin_to_F(y["temp_max"])
+
+        current_pressure = y["pressure"]  # in hPa
+        current_humidity = y["humidity"]  # percentage
+
+        z = x["weather"]
+        weather_description = z[0]["description"]  # description of weather
+
+        print("\nCurrent temperature: " + str(curr_temp_F) + "°F")
+        print("High: " + str(temp_high) + "°F")
+        print("Low: " + str(temp_low) + "°F")
+        print("Condition: " + weather_description)
+        print("Atmospheric pressure: " + str(current_pressure) + " hPa")
+        print("Humidity: " + str(current_humidity) + "%\n")
+
+        temp_range_text = " with a high of " + str(temp_high) + " and a low of " + str(temp_low)
+        temp_text = "The temperature in " + location + "is " \
+                    + str(curr_temp_F) + " degrees fahrenheit " + temp_range_text
+        weather_descript_text = "with a " + weather_description
+        atm_pressure_text = "The atmospheric pressure is " + str(current_pressure) \
+                            + " Hectopascal Pressure Units "
+        humidity_text = "The humidity is at " + str(current_humidity) + " percent"
+
+        subprocess.call(['say', temp_text + weather_descript_text])
+        subprocess.call(['say', atm_pressure_text])
+        subprocess.call(['say', humidity_text])
+    else:
+        say("City not found")
+
+
+def question():
+    question_trigger = command_received.split("what is ")[-1]
+    weather = "weather"
+    if weather in question_trigger:
+        if "the weather in" in question_trigger:
+            location = question_trigger.split("the weather in ")[-1]
+            weather_data(location)  # pull weather json to parse and read out daily data
+        elif "the weather for this week" in question_trigger:
+            open_page("weather.com")  # search online websites for visual data
 
 
 def bluetooth(started):  # TODO
@@ -277,10 +364,47 @@ def start_car():  # TODO
     bluetooth(True)
 
 
+def pause_play():  # pause/play song on spotify TODO
+    lol = 4
+
+
+def search_spotify():  # look up songs on spotify TODO
+    lol = 1
+
+
+def spotify_controls():
+    print("\nSpotify controls:")
+    print("Enter: pause/play")  # alternates between pausing and playing
+    print("Space: search new song")  # pause and listen for new search
+    print("q: quit Spotify commands")  # program releases control and moves on
+    print("/: quit Spotify")  # close Spotify and exit function
+    print(">", end=" ")
+    spotify_input = input()  # can't use dictionary due to last 2 commands
+    while spotify_input != 'q' or spotify_input != '/':
+        print(spotify_input)
+        if spotify_input == '':
+            pause_play()
+            print("Pausing")
+        elif spotify_input == ' ':
+            search_spotify()
+            print("Searching")
+        elif spotify_input == 'q':
+            # exit function but continue playback
+            break
+        elif spotify_input == '/':
+            # close spotify and exit function
+            break
+        print(">", end=" ")
+        spotify_input = input()
+    say("Exiting Spotify controls")
+
+
 def open_app():
     app = command_received.split('open ')[-1]
     d = '/Applications'
     os.system('open ' + d + '/%s.app' % app.replace(' ', '\ '))
+    if app == 'spotify':
+        spotify_controls()
 
 
 def create_file():  # creates and opens new sublime text file - TODO
@@ -292,15 +416,16 @@ def shut_down():
     say("Have a good day")
 
 
-user = ''
+user = ' '
 triggers = {"look": search,
+            "what": question,
             "star": start_car,
             "open": open_app,
             "chec": check_email,
-            "navi": open_page,
+            "navi": open_page_parse,
             "crea": create_file,
             "that": shut_down}
-facial_train()
+# facial_train()
 verified = greeting()
 keep_going = True
 
@@ -310,7 +435,8 @@ while not verified:
     # command_received = input("Enter command: ")
     if command_received == "yes":
         user = greeting()
-        if user != '':
+        if user != ' ':
+            print("User: " + user)
             verified = True
     else:
         say("Shutting down")
@@ -318,9 +444,9 @@ while not verified:
 
 if verified:
     while keep_going:
-        print("In loop")
-        # command_received = command()
-        command_received = input("Enter command: ")
+        # print("In loop")
+        command_received = command()
+        # command_received = input("Enter command: ")
         print("> " + command_received)
 
         if command_received != "No command received":
