@@ -9,6 +9,7 @@ Python libraries:
 - OpenCV - facial recognition
 - Pillow
 - Pickle - for storing image dataset for facial recognition
+- OpenWeatherMap API - pulling local weather data
 
 Primary functions:
 - Personal assistance
@@ -56,3 +57,4 @@ Currently able to...
 	- sign into Gmail
 	- navigate directly to specified website
 - launch applications downloaded on machine
+- pull weather data from OpenWeatherMap API, parse it, and read it out upon request
