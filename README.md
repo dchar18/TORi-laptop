@@ -1,5 +1,6 @@
 # TORi
 Python Virtual Assitant
+Version: laptop
 
 Python libraries:
 - SpeechRecognition - for recording commands
